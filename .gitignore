@@ -1,0 +1,6 @@
+__pycache__/
+*.tmp
+
+# Documents under review stay on your machine; only the bundled example is committed.
+documents/*
+!documents/example-*/

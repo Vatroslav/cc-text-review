@@ -1,0 +1,16 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "cc-text-review",
+      "runtimeExecutable": "python",
+      "runtimeArgs": [
+        "C:/Users/mileu/github/cc-text-review/review.py",
+        "serve",
+        "--port",
+        "4590"
+      ],
+      "port": 4590
+    }
+  ]
+}

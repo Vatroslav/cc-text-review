@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Text review</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header id="header"></header>
+<div id="layout">
+  <main id="document"></main>
+  <aside id="sidebar"></aside>
+</div>
+<button id="comment-btn" type="button" hidden>Comment</button>
+<div id="composer" hidden>
+  <div class="composer-quote"></div>
+  <textarea rows="4" placeholder="Comment (Ctrl+Enter saves, Esc cancels)"></textarea>
+  <div class="composer-buttons">
+    <button type="button" class="cancel">Cancel</button>
+    <button type="button" class="save primary">Save</button>
+  </div>
+</div>
+<div id="toast" hidden></div>
+<script src="app.js"></script>
+</body>
+</html>

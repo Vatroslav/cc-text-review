@@ -1,0 +1,45 @@
+[
+  {
+    "id": "c1",
+    "version": 1,
+    "author": "user",
+    "quote": "45 minutes long",
+    "nth": 1,
+    "text": "Make it 30 minutes, we never use the full slot.",
+    "status": "resolved",
+    "resolved_in": 2,
+    "time": "2026-10-18T10:00:00+02:00",
+    "replies": [
+      {"author": "claude", "text": "Shortened to 30 minutes.", "time": "2026-10-18T10:05:00+02:00"}
+    ]
+  },
+  {
+    "id": "c2",
+    "version": 1,
+    "author": "user",
+    "quote": "let me know by Friday",
+    "nth": 1,
+    "text": "Ask people to reply in the team channel, not by email.",
+    "status": "resolved",
+    "resolved_in": 2,
+    "time": "2026-10-18T10:01:00+02:00",
+    "replies": [
+      {"author": "claude", "text": "Changed to a reply in the team channel.", "time": "2026-10-18T10:05:00+02:00"}
+    ]
+  },
+  {
+    "id": "c3",
+    "version": 1,
+    "author": "claude",
+    "quote": "for a month",
+    "nth": 1,
+    "text": "Should the trial end on a set date, so everyone knows when the decision comes?",
+    "status": "resolved",
+    "resolved_in": 2,
+    "time": "2026-10-18T09:55:00+02:00",
+    "replies": [
+      {"author": "user", "text": "Yes, the end of next month.", "time": "2026-10-18T10:02:00+02:00"},
+      {"author": "claude", "text": "Added the end of next month.", "time": "2026-10-18T10:05:00+02:00"}
+    ]
+  }
+]
