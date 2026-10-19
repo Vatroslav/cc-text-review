@@ -36,8 +36,10 @@ exits, and the exit wakes the session that started it (tested 19 Oct 2026 in the
   (or 15 minutes pass).
 - A newer `wait` on the same document takes over: the older one exits with "Another listener
   took over". So the session that opened the document last is the one the button wakes.
-- `wait` stops on its own after 8 hours (`--hours N`). `python review.py status <slug>` shows the
-  state.
+- `python review.py stop <slug>` stops the listener when the text is final: the running `wait`
+  notices within a second and exits (no task ID needed, so it works after the conversation was
+  summarized and from another session). Otherwise `wait` stops on its own after 8 hours
+  (`--hours N`). `python review.py status <slug>` shows the state.
 
 ## The round (Claude)
 
@@ -65,16 +67,20 @@ exits, and the exit wakes the session that started it (tested 19 Oct 2026 in the
    questions are open. Do not print the text again; Vatra reads it on the page.
 7. **Listen again**, as the last step: `python review.py status <slug>`, and unless it says
    "Listening", start `wait` in the background again. After a Send to Claude round the old
-   listener has exited; after a round from chat it is usually still listening.
+   listener has exited; after a round from chat it is usually still listening. Not when Vatra
+   approved the text: then it goes back to its repo and the listener is stopped (below).
 
-When `wait` exits with "Another listener took over" or "Stopped listening", do not restart it;
-one line in chat at most.
+When `wait` exits with "Another listener took over", "was stopped" or "Stopped listening", do not
+restart it; one line in chat at most.
 
 Claude can leave a comment too (a factual question, a suggestion):
 `python review.py comment <slug> "<quote as displayed, without ** or _>" "<text>" [--nth N]`.
 
 When the text is final, it goes back to its own repo (the source in `meta.json`). That repo is
 the source of truth for the content; the rounds stay only on this machine, in `documents/`.
+Then `python review.py stop <slug>`, so no listener is left running for a finished text. The same
+when Vatra drops a document. Opening another document does not stop the first one's listener;
+Vatra may come back to it.
 
 ## Rules
 

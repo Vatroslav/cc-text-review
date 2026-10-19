@@ -16,6 +16,7 @@ Commands for Claude (details in CLAUDE.md):
     python review.py comment <slug> "<quote>" "<text>" [--nth N]
     python review.py wait <slug> [--hours N]     (run in the background)
     python review.py status <slug>
+    python review.py stop <slug>                 (when the text is final)
 
 Standard library only. Data lives in documents/<slug>/: v1.md, v2.md ...,
 meta.json (title, source, notes per version) and comments.json. The Send to
@@ -504,11 +505,15 @@ def cmd_wait(a):
         while time.time() < deadline:
             time.sleep(1)
             try:
-                if listener_token(d) != token:
-                    print(f"Another listener took over {a.slug}; nothing to do.")
-                    return
+                current = listener_token(d)
             except ValueError:
                 continue
+            if current is None:
+                print(f"Listener for {a.slug} was stopped (`review.py stop`); nothing to do.")
+                return
+            if current != token:
+                print(f"Another listener took over {a.slug}; nothing to do.")
+                return
             try:
                 os.replace(d / SUBMIT, d / CLAIMED)
             except FileNotFoundError:
@@ -530,6 +535,20 @@ def cmd_wait(a):
                 (d / LISTENER).unlink()
         except (OSError, ValueError):
             pass
+
+
+def cmd_stop(a):
+    """Stop listening when the text is final: the running `wait` notices and exits."""
+    d = doc_dir(a.slug)
+    had_listener = (d / LISTENER).exists()
+    for name in (LISTENER, SUBMIT, CLAIMED):
+        for _ in range(10):
+            try:
+                (d / name).unlink(missing_ok=True)
+                break
+            except PermissionError:
+                time.sleep(0.2)
+    print(f"Stopped listening for {a.slug}." if had_listener else f"No listener for {a.slug}.")
 
 
 def cmd_status(a):
@@ -578,6 +597,8 @@ def main():
     s.add_argument("--hours", type=float, default=8)
     s = sub.add_parser("status")
     s.add_argument("slug")
+    s = sub.add_parser("stop")
+    s.add_argument("slug")
 
     a = p.parse_args()
     if a.command == "serve":
@@ -594,6 +615,7 @@ def main():
         "comment": cmd_comment,
         "wait": cmd_wait,
         "status": cmd_status,
+        "stop": cmd_stop,
     }[a.command](a)
 
 
