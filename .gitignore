@@ -4,3 +4,8 @@ __pycache__/
 # Documents under review stay on your machine; only the bundled example is committed.
 documents/*
 !documents/example-*/
+
+# Send to Claude handoff state
+listener.json
+submit.json
+claimed.json

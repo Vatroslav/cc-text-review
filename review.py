@@ -14,9 +14,12 @@ Commands for Claude (details in CLAUDE.md):
     python review.py reply <slug> <id> "<text>"
     python review.py reject <slug> <id> "<reason>"
     python review.py comment <slug> "<quote>" "<text>" [--nth N]
+    python review.py wait <slug> [--hours N]     (run in the background)
+    python review.py status <slug>
 
 Standard library only. Data lives in documents/<slug>/: v1.md, v2.md ...,
-meta.json (title, source, notes per version) and comments.json.
+meta.json (title, source, notes per version) and comments.json. The Send to
+Claude button uses listener.json, submit.json and claimed.json there.
 """
 
 import argparse
@@ -26,6 +29,7 @@ import os
 import re
 import shutil
 import sys
+import time
 from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -35,6 +39,13 @@ DOCUMENTS = ROOT / "documents"
 APP = ROOT / "app"
 SLUG_RE = re.compile(r"[a-z0-9][a-z0-9-]{0,80}")
 VERSION_RE = re.compile(r"v(\d+)\.md")
+
+# Send to Claude: `wait` keeps listener.json fresh, the button writes submit.json,
+# and `wait` claims it (renames it to claimed.json), prints the comments and exits.
+LISTENER, SUBMIT, CLAIMED = "listener.json", "submit.json", "claimed.json"
+HANDOFF_FILES = {LISTENER, SUBMIT, CLAIMED}
+FRESH = 10            # seconds: a listener older than this is gone
+WORKING = 15 * 60     # seconds: how long "Claude is working" shows without a new listener
 
 
 # ---------- storage ----------
@@ -107,16 +118,38 @@ def find(items, cid):
     raise KeyError(f"no comment {cid}")
 
 
+def content_files(d):
+    return [f for f in sorted(d.iterdir()) if f.suffix != ".tmp" and f.name not in HANDOFF_FILES]
+
+
 def revision(slug):
     d = doc_dir(slug)
     h = hashlib.sha1()
     if d.is_dir():
-        for f in sorted(d.iterdir()):
-            if f.suffix == ".tmp":
-                continue
+        for f in content_files(d):
             st = f.stat()
             h.update(f"{f.name}:{st.st_mtime_ns}:{st.st_size};".encode())
     return h.hexdigest()[:12]
+
+
+def age(path):
+    try:
+        return time.time() - path.stat().st_mtime
+    except OSError:
+        return None
+
+
+def handoff(slug):
+    """State of the Send to Claude button: sent, working, listening or off."""
+    d = doc_dir(slug)
+    listener = age(d / LISTENER)
+    listening = listener is not None and listener < FRESH
+    if (d / SUBMIT).exists():
+        return "sent" if listening else "off"
+    claimed = age(d / CLAIMED)
+    if claimed is not None and claimed < WORKING:
+        return "working"
+    return "listening" if listening else "off"
 
 
 def document(slug):
@@ -135,6 +168,7 @@ def document(slug):
         ],
         "comments": comments(slug),
         "rev": revision(slug),
+        "handoff": handoff(slug),
     }
 
 
@@ -154,7 +188,7 @@ def list_documents():
             "title": meta(d.name).get("title", d.name),
             "versions": len(numbers),
             "open": sum(1 for c in items if c.get("status") == "open"),
-            "modified": max(f.stat().st_mtime for f in d.iterdir()),
+            "modified": max(f.stat().st_mtime for f in content_files(d)),
         })
     out.sort(key=lambda x: x["modified"], reverse=True)
     return out
@@ -205,7 +239,7 @@ class Handler(BaseHTTPRequestHandler):
             if m:
                 slug = m.group(1)
                 if m.group(2):
-                    return self.send(200, {"rev": revision(slug)})
+                    return self.send(200, {"rev": revision(slug), "handoff": handoff(slug)})
                 return self.send(200, document(slug))
             self.error(404, "not found")
         except FileNotFoundError:
@@ -226,11 +260,24 @@ class Handler(BaseHTTPRequestHandler):
             m = re.fullmatch(r"/api/documents/([^/]+)/comments/(c\d+)/reopen", path)
             if m:
                 return self.send(200, reopen(m.group(1), m.group(2)))
+            m = re.fullmatch(r"/api/documents/([^/]+)/submit", path)
+            if m:
+                return self.submit(m.group(1))
             self.error(404, "not found")
         except (ValueError, KeyError) as e:
             self.error(400, str(e))
         except FileNotFoundError:
             self.error(404, "no such document")
+
+    def submit(self, slug):
+        if not versions(slug):
+            raise FileNotFoundError(slug)
+        state = handoff(slug)
+        if state == "off":
+            return self.error(409, "Claude isn't listening. Tell Claude in chat to check the comments.")
+        if state == "listening":
+            write_json(doc_dir(slug) / SUBMIT, {"time": now()})
+        self.send(200, {"handoff": handoff(slug)})
 
     def do_DELETE(self):
         path = self.path.split("?", 1)[0]
@@ -429,6 +476,71 @@ def cmd_comment(a):
     print(f"Comment {c['id']} added to v{latest}.")
 
 
+def listener_token(d):
+    """Token of the current listener, None if there is none; raises ValueError while it is rewritten."""
+    try:
+        return json.loads((d / LISTENER).read_text(encoding="utf-8")).get("token")
+    except FileNotFoundError:
+        return None
+    except OSError as e:
+        raise ValueError(e)
+
+
+def cmd_wait(a):
+    """Block until the user presses Send to Claude, then print the open comments and exit.
+
+    Claude runs this in the background; its exit wakes the session. A newer `wait` on the
+    same document takes over, and this one exits.
+    """
+    if not versions(a.slug):
+        sys.exit(f"no document {a.slug}")
+    d = doc_dir(a.slug)
+    token = f"{os.getpid()}-{time.time_ns()}"
+    for name in (SUBMIT, CLAIMED):
+        (d / name).unlink(missing_ok=True)
+    write_json(d / LISTENER, {"token": token, "since": now()})
+    deadline = time.time() + a.hours * 3600
+    try:
+        while time.time() < deadline:
+            time.sleep(1)
+            try:
+                if listener_token(d) != token:
+                    print(f"Another listener took over {a.slug}; nothing to do.")
+                    return
+            except ValueError:
+                continue
+            try:
+                os.replace(d / SUBMIT, d / CLAIMED)
+            except FileNotFoundError:
+                pass
+            except OSError:
+                continue
+            else:
+                print(f"The user pressed Send to Claude on {a.slug}. Do the round, then start `wait` again.\n")
+                cmd_open_comments(a)
+                return
+            try:
+                os.utime(d / LISTENER)
+            except OSError:
+                pass
+        print(f"Stopped listening for {a.slug} after {a.hours:g} hours; the page now says Claude isn't listening.")
+    finally:
+        try:
+            if listener_token(d) == token:
+                (d / LISTENER).unlink()
+        except (OSError, ValueError):
+            pass
+
+
+def cmd_status(a):
+    print({
+        "listening": "Listening: the Send to Claude button wakes the session that ran `wait`.",
+        "sent": "Sent: the user pressed Send to Claude; the listener picks it up within a second.",
+        "working": "Working: a listener picked up Send to Claude; start `wait` again after the round.",
+        "off": "Not listening: start `review.py wait` in the background.",
+    }[handoff(a.slug)])
+
+
 def main():
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8")
@@ -461,6 +573,11 @@ def main():
     s.add_argument("quote")
     s.add_argument("text")
     s.add_argument("--nth", type=int, default=1)
+    s = sub.add_parser("wait")
+    s.add_argument("slug")
+    s.add_argument("--hours", type=float, default=8)
+    s = sub.add_parser("status")
+    s.add_argument("slug")
 
     a = p.parse_args()
     if a.command == "serve":
@@ -475,6 +592,8 @@ def main():
         "reply": cmd_reply,
         "reject": cmd_reject,
         "comment": cmd_comment,
+        "wait": cmd_wait,
+        "status": cmd_status,
     }[a.command](a)
 
 

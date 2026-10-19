@@ -77,6 +77,7 @@ button:disabled { opacity: .4; cursor: default; }
 #header .title a { color: var(--muted); text-decoration: none; font-weight: 400; }
 #header .source { color: var(--muted); font-size: 13px; font-weight: 400; }
 #header .group { display: flex; gap: 4px; }
+#header .handoff-state { font-size: 13px; color: var(--muted); }
 
 /* layout */
 #layout { display: flex; align-items: flex-start; }
@@ -169,7 +170,6 @@ del { background: var(--deleted-bg); color: var(--deleted-text); text-decoration
 .card .warning { font-size: 12px; color: var(--uncommented); margin-top: 6px; }
 .card textarea { width: 100%; margin-top: 8px; font: inherit; font-size: 14px; padding: 6px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); color: var(--text); }
 .empty { color: var(--muted); font-size: 14px; }
-.hint { color: var(--muted); font-size: 13px; border-top: 1px solid var(--border); padding-top: 10px; margin-top: 16px; }
 
 /* floating button and composer */
 #comment-btn {

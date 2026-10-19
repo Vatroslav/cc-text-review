@@ -14,6 +14,7 @@ const st = {
   selection: null,
   changes: null,
   uncommentedIndex: 0,
+  handoff: 'off',
 };
 const el = id => document.getElementById(id);
 
@@ -566,8 +567,6 @@ function card(c, { subtitle = '', warning = '', changes = null } = {}) {
   </div>`;
 }
 
-const HINT = '<p class="hint">When you are done, tell Claude in chat to check the comments.</p>';
-
 function sidebarText() {
   const v = st.version, latest = latestVersion();
   const onVersion = st.doc.comments.filter(c => c.version === v);
@@ -583,7 +582,6 @@ function sidebarText() {
   if (closed.length) {
     h += `<details><summary>Resolved and rejected (${closed.length})</summary>${closed.map(c => card(c)).join('')}</details>`;
   }
-  if (v === latest && [...open, ...fromEarlier].some(waitsForClaude)) h += HINT;
   el('sidebar').innerHTML = h;
 }
 
@@ -598,7 +596,6 @@ function sidebarChanges() {
   let h = '';
   if (openHere.length) {
     h += `<h3>Open comments on v${v} (${openHere.length})</h3>${openHere.map(c => card(c)).join('')}`;
-    if (latest && openHere.some(waitsForClaude)) h += HINT;
   } else if (latest) {
     h += '<p class="empty">To add a comment, select text with the mouse, here or in the Text view.</p>';
   }
@@ -632,7 +629,34 @@ function header() {
     <div class="group">
       <button data-view="text" class="${st.view === 'text' ? 'active' : ''}">Text</button>
       <button data-view="changes" class="${st.view === 'changes' ? 'active' : ''}"${st.version === 1 ? ' disabled' : ''}>${changesLabel}</button>
-    </div>`;
+    </div>
+    <div class="group" id="handoff">${handoffHtml()}</div>`;
+}
+
+// Send to Claude: the button wakes the Claude session that runs `review.py wait`.
+function handoffHtml() {
+  const n = st.doc.comments.filter(waitsForClaude).length;
+  if (st.handoff === 'listening') {
+    return n
+      ? `<button data-action="send" class="primary">Send to Claude (${n})</button>`
+      : '<button disabled title="No comments waiting for Claude">Send to Claude</button>';
+  }
+  if (st.handoff === 'sent') return '<span class="handoff-state">Sent…</span>';
+  if (st.handoff === 'working') return '<span class="handoff-state">Claude is working on it…</span>';
+  return n ? '<span class="handoff-state">Claude isn\'t listening: tell Claude in chat to check the comments.</span>' : '';
+}
+
+function updateHandoff() {
+  if (el('handoff')) el('handoff').innerHTML = handoffHtml();
+}
+
+async function sendToClaude() {
+  if (isWriting()) return toast('Save or cancel your comment first.');
+  if (await send('POST', '/submit', {})) {
+    st.handoff = 'sent';
+    updateHandoff();
+    toast('Sent to Claude');
+  }
 }
 
 function render() {
@@ -678,6 +702,7 @@ async function load() {
   const previousLatest = st.doc && st.doc.slug === st.slug ? latestVersion() : null;
   st.doc = await r.json();
   st.rev = st.doc.rev;
+  st.handoff = st.doc.handoff;
   st.parsed.clear();
   const latest = latestVersion();
   if (previousLatest && latest > previousLatest && st.version === previousLatest) {
@@ -692,10 +717,14 @@ async function load() {
 const isWriting = () => !el('composer').hidden || [...el('sidebar').querySelectorAll('textarea')].some(t => t.value.trim() || t === document.activeElement);
 
 async function poll() {
-  if (!st.slug || !st.doc || isWriting()) return;
+  if (!st.slug || !st.doc) return;
   try {
-    const { rev } = await (await fetch(`${API}/${st.slug}/rev`)).json();
-    if (rev !== st.rev) await load();
+    const { rev, handoff } = await (await fetch(`${API}/${st.slug}/rev`)).json();
+    if (handoff !== st.handoff) {
+      st.handoff = handoff;
+      updateHandoff();
+    }
+    if (rev !== st.rev && !isWriting()) await load();
   } catch { /* server stopped; try again */ }
 }
 
@@ -854,6 +883,7 @@ el('composer').querySelector('textarea').addEventListener('keydown', e => {
 el('header').addEventListener('click', e => {
   const b = e.target.closest('button');
   if (!b || b.disabled) return;
+  if (b.dataset.action === 'send') return sendToClaude();
   if (b.dataset.version) {
     st.version = +b.dataset.version;
     if (st.version === 1) st.view = 'text';

@@ -19,6 +19,8 @@ changed gets old fast.
 - **Changes nobody asked for stand out.** Anything changed outside the commented places is
   outlined in dashed orange, so unrequested edits cannot slip through.
 - **Claude can comment too**, for example to ask about a fact before changing it.
+- **Send to Claude.** When you are done commenting, one button in the page wakes the Claude Code
+  session; no need to switch to the chat.
 
 It runs as a small local web page, ideal for the Browser pane of the Claude Code desktop app, next
 to the conversation.
@@ -63,6 +65,16 @@ python review.py resolve <slug> <id> "<reply>"  # also: reply, reject, comment, 
 
 Claude edits only the commented places in the new version; the page notices the new version and
 switches to the Changes view on its own.
+
+The Send to Claude button works through a listener Claude runs in the background:
+
+```bash
+python review.py wait <slug>    # blocks until you press Send to Claude, prints the comments, exits
+python review.py status <slug>  # listening, sent, working or not listening
+```
+
+In Claude Code, a background command that exits wakes the session that started it, so the button
+starts the next round. When nothing listens, the page says so and you tell Claude in chat.
 
 ## Where your text lives
 
