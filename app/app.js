@@ -878,7 +878,7 @@ el('composer').querySelector('.save').addEventListener('click', saveComment);
 el('composer').querySelector('.cancel').addEventListener('click', closeComposer);
 // Enter submits a comment or reply; Shift+Enter inserts a new line.
 const isSubmit = e => e.key === 'Enter' && !e.shiftKey && !e.isComposing;
-const autoGrow = t => { t.style.height = 'auto'; t.style.height = t.scrollHeight + 'px'; };
+const autoGrow = t => { t.style.height = 'auto'; t.style.height = t.scrollHeight + t.offsetHeight - t.clientHeight + 'px'; };
 document.addEventListener('input', e => {
   if (e.target.matches('#composer textarea, #sidebar textarea')) autoGrow(e.target);
 });
@@ -933,7 +933,7 @@ el('sidebar').addEventListener('click', async e => {
     const action = button.dataset.action;
     if (action === 'reply') {
       if (!c.querySelector('textarea')) {
-        c.insertAdjacentHTML('beforeend', `<textarea rows="1" placeholder="Reply (Enter sends, Shift+Enter new line)"></textarea>
+        c.insertAdjacentHTML('beforeend', `<textarea rows="1" placeholder="Reply · Shift+Enter new line"></textarea>
           <div class="footer"><span class="status"></span><button data-action="cancel-reply">Cancel</button><button data-action="send-reply" class="primary">Send</button></div>`);
       }
       c.querySelector('textarea').focus();

@@ -168,7 +168,7 @@ del { background: var(--deleted-bg); color: var(--deleted-text); text-decoration
 .card .footer { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 8px; }
 .card .status { font-size: 12px; color: var(--muted); margin-right: auto; }
 .card .warning { font-size: 12px; color: var(--uncommented); margin-top: 6px; }
-.card textarea { width: 100%; margin-top: 8px; font: inherit; font-size: 14px; padding: 6px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); color: var(--text); }
+.card textarea { width: 100%; margin-top: 8px; font: inherit; font-size: 14px; padding: 6px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); color: var(--text); box-sizing: border-box; overflow: hidden; resize: none; }
 .empty { color: var(--muted); font-size: 14px; }
 
 /* floating button and composer */
@@ -191,7 +191,7 @@ del { background: var(--deleted-bg); color: var(--deleted-text); text-decoration
   padding: 10px;
 }
 #composer .composer-quote { font-size: 13px; color: var(--muted); font-style: italic; margin-bottom: 6px; max-height: 4.5em; overflow: hidden; }
-#composer textarea { width: 100%; font: inherit; font-size: 14px; padding: 6px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); color: var(--text); resize: vertical; }
+#composer textarea { width: 100%; font: inherit; font-size: 14px; padding: 6px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); color: var(--text); box-sizing: border-box; overflow: hidden; resize: none; }
 #composer .composer-buttons { display: flex; justify-content: flex-end; gap: 6px; margin-top: 6px; }
 
 #toast {
