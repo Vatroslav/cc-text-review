@@ -805,6 +805,7 @@ function openComposer() {
   const btn = el('comment-btn'), c = el('composer');
   c.querySelector('.composer-quote').textContent = `“${shorten(st.selection.quote, 200)}”`;
   c.querySelector('textarea').value = '';
+  c.querySelector('textarea').style.height = '';
   c.style.top = btn.style.top;
   c.style.left = `${Math.max(8, Math.min(parseFloat(btn.style.left), window.scrollX + window.innerWidth - 356))}px`;
   c.hidden = false;
@@ -875,8 +876,15 @@ el('comment-btn').addEventListener('mousedown', e => e.preventDefault());
 el('comment-btn').addEventListener('click', openComposer);
 el('composer').querySelector('.save').addEventListener('click', saveComment);
 el('composer').querySelector('.cancel').addEventListener('click', closeComposer);
+// Enter submits a comment or reply; Shift+Enter inserts a new line.
+const isSubmit = e => e.key === 'Enter' && !e.shiftKey && !e.isComposing;
+const autoGrow = t => { t.style.height = 'auto'; t.style.height = t.scrollHeight + 'px'; };
+document.addEventListener('input', e => {
+  if (e.target.matches('#composer textarea, #sidebar textarea')) autoGrow(e.target);
+});
+
 el('composer').querySelector('textarea').addEventListener('keydown', e => {
-  if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); saveComment(); }
+  if (isSubmit(e)) { e.preventDefault(); saveComment(); }
   if (e.key === 'Escape') closeComposer();
 });
 
@@ -925,7 +933,7 @@ el('sidebar').addEventListener('click', async e => {
     const action = button.dataset.action;
     if (action === 'reply') {
       if (!c.querySelector('textarea')) {
-        c.insertAdjacentHTML('beforeend', `<textarea rows="3" placeholder="Reply (Ctrl+Enter sends)"></textarea>
+        c.insertAdjacentHTML('beforeend', `<textarea rows="1" placeholder="Reply (Enter sends, Shift+Enter new line)"></textarea>
           <div class="footer"><span class="status"></span><button data-action="cancel-reply">Cancel</button><button data-action="send-reply" class="primary">Send</button></div>`);
       }
       c.querySelector('textarea').focus();
@@ -958,7 +966,7 @@ el('sidebar').addEventListener('click', async e => {
 
 el('sidebar').addEventListener('keydown', async e => {
   if (e.target.tagName !== 'TEXTAREA') return;
-  if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); await sendReply(e.target.closest('.card')); }
+  if (isSubmit(e)) { e.preventDefault(); await sendReply(e.target.closest('.card')); }
 });
 
 async function sendReply(c) {
